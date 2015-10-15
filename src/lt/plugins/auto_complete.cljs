@@ -152,15 +152,29 @@
                                             (when-let [cur (pool/last-active)]
                                               (let [token (-> @hinter :starting-token :string)]
                                                 (distinct-completions
-                                                 (if token
-                                                   (remove #(= token (.-completion %))
-                                                           (object/raise-reduce cur :hints+ [] token))
-                                                   (object/raise-reduce cur :hints+ []))))))
+                                                 (remove-long-completitions
+                                                  (if token
+                                                    (remove #(= token (.-completion %))
+                                                            (object/raise-reduce cur :hints+ [] token))
+                                                    (object/raise-reduce cur :hints+ [])))
+                                                 ))))
                                    :key text|completion})
                 (object/add-tags [:hinter])))
 
+(defn remove-long-completitions [hints]
+  (filter #(< (.-length (.-completion %)) (:hint-limit @hinter)) hints))
+
 (defn on-line-change [line ch]
   (object/raise hinter :line-change line ch))
+
+(behavior ::set-hint-limit
+          :triggers #{:object.instant}
+          :type :user
+          :desc "Hinter: set maximum length of an autocomplete hint"
+          :params [{:label "Number"
+                    :example 1000}]
+          :reaction (fn [this n]
+                      (object/merge! this {:hint-limit n})))
 
 (behavior ::textual-hints
           :triggers #{:hints+}
